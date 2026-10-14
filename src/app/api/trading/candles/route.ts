@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getUserSession } from "@/lib/auth/session";
 
 const intervals = new Set(["15min", "1h", "4h", "1day"]);
 const intervalMilliseconds: Record<string, number> = {
@@ -23,6 +24,10 @@ type ProviderResponse = {
 };
 
 export async function GET(request: Request) {
+  if (!await getUserSession()) {
+    return NextResponse.json({ error: "Silakan masuk untuk mengakses data ini." }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol")?.toUpperCase() ?? "";
   const interval = searchParams.get("interval") ?? "";

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getUserSession } from "@/lib/auth/session";
 
 export const maxDuration = 30;
 
@@ -42,6 +43,10 @@ function getProviderError(payload: unknown): string | undefined {
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
 
 export async function POST(request: Request) {
+  if (!await getUserSession()) {
+    return NextResponse.json({ error: "Silakan masuk untuk mengakses analisa ini." }, { status: 401 });
+  }
+
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const model = process.env.GEMINI_MODEL?.trim();
 
