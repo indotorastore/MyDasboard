@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
   ArrowDownRight,
@@ -13,7 +14,6 @@ import {
   ChevronRight,
   CircleHelp,
   Clock3,
-  Command,
   FileText,
   House,
   LayoutGrid,
@@ -122,9 +122,7 @@ export default function Home() {
         mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       }`}>
         <a href="#" className="mb-11 flex h-10 shrink-0 items-center gap-3 px-1" aria-label="Ruangku beranda">
-          <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-indigo-600 text-white shadow-lg shadow-indigo-200">
-            <Command size={21} strokeWidth={2.4} />
-          </span>
+          <Image src="/ruangku-logo.png" alt="" width={40} height={40} unoptimized className="size-10 shrink-0 rounded-full object-contain" />
           <span className="overflow-hidden whitespace-nowrap opacity-100 transition-opacity lg:opacity-0 lg:group-hover/sidebar:opacity-100 lg:group-focus-within/sidebar:opacity-100">
             <span className="block text-[17px] font-bold tracking-tight">ruangku</span>
             <span className="block text-[11px] font-medium text-slate-400">ruang kerja personal</span>
@@ -206,9 +204,7 @@ export default function Home() {
                 <Menu size={18} />
               </button>
               <a href="#" className="flex items-center gap-2.5" aria-label="Ruangku beranda">
-              <span className="grid size-9 place-items-center rounded-xl bg-indigo-600 text-white">
-                <Command size={19} strokeWidth={2.4} />
-              </span>
+              <Image src="/ruangku-logo.png" alt="" width={36} height={36} unoptimized className="size-9 rounded-full object-contain" />
               <span className="text-[16px] font-bold tracking-tight">ruangku</span>
               </a>
             </div>

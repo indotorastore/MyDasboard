@@ -18,6 +18,12 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Progressive Web App
+
+Ruangku dapat dipasang dari browser yang mendukung instalasi web app. Buka situs melalui HTTPS (atau `localhost`), lalu pilih **Pasang Ruangku** atau gunakan menu instalasi browser. Di iPhone/iPad, buka dengan Safari dan pilih **Bagikan → Tambah ke Layar Utama**. Service worker menyimpan aset Next.js dan halaman beranda yang pernah dibuka agar dapat dimuat kembali saat offline; data Forex/API tidak disimpan dan memerlukan koneksi internet.
+
+Logo aplikasi dan ikon browser/PWA menggunakan PNG `public/ruangku-logo.png`, dengan ukuran ikon instalasi yang dibuat dari file tersebut.
+
 ## Trading Forex
 
 Salin `.env.example` menjadi `.env.local`, lalu isi variabel yang diperlukan untuk fitur yang sudah digunakan:
