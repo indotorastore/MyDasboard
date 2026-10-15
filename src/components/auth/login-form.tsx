@@ -12,11 +12,26 @@ import {
   sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signInWithRedirect,
   signOut,
 } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase/client";
+
+function getGoogleLoginError(cause: unknown) {
+  const code = typeof cause === "object" && cause !== null && "code" in cause
+    ? String(cause.code)
+    : "";
+  if (code === "auth/operation-not-allowed") {
+    return "Login Google belum diaktifkan. Silakan hubungi pengelola aplikasi.";
+  }
+  if (code === "auth/unauthorized-domain") {
+    return "Domain aplikasi belum diizinkan untuk login Google. Silakan hubungi pengelola aplikasi.";
+  }
+  if (code === "auth/network-request-failed") {
+    return "Koneksi bermasalah. Periksa internet lalu coba lagi.";
+  }
+  return cause instanceof Error ? cause.message : "Login dengan Google gagal. Silakan coba kembali.";
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -26,7 +41,6 @@ export function LoginForm() {
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [resetPending, setResetPending] = useState(false);
-  const [showGoogleRedirect, setShowGoogleRedirect] = useState(false);
   const redirectResultHandled = useRef(false);
 
   useEffect(() => {
@@ -60,13 +74,14 @@ export function LoginForm() {
               console.error("Gagal membersihkan sesi Firebase client setelah login Google gagal:", signOutError);
             }
           }
-          setError(cause instanceof Error ? cause.message : "Login dengan Google gagal. Coba kembali.");
+          setError(getGoogleLoginError(cause));
         } finally {
           setPending(false);
         }
       })
       .catch((cause: unknown) => {
-        setError(cause instanceof Error ? cause.message : "Hasil login Google tidak dapat diverifikasi.");
+        setError(getGoogleLoginError(cause));
+        setPending(false);
       });
   }, [router]);
 
@@ -75,74 +90,11 @@ export function LoginForm() {
     setNotice("");
     setPending(true);
 
-    let signedIn = false;
-    try {
-      await setPersistence(firebaseAuth, inMemoryPersistence);
-      const credential = await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
-      signedIn = true;
-      const idToken = await credential.user.getIdToken(true);
-      const response = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? "Akun ini belum diizinkan masuk ke Ruangku.");
-      }
-      await signOut(firebaseAuth);
-      router.replace("/");
-      router.refresh();
-    } catch (cause) {
-      if (signedIn && firebaseAuth.currentUser) {
-        try {
-          await signOut(firebaseAuth);
-        } catch (signOutError) {
-          console.error("Gagal membersihkan sesi Firebase client setelah login Google gagal:", signOutError);
-        }
-      }
-      const code = typeof cause === "object" && cause !== null && "code" in cause
-        ? String(cause.code)
-        : "";
-      setError(
-        code === "auth/popup-closed-by-user"
-            ? "Jendela Google tertutup sebelum proses masuk selesai."
-          : code === "auth/popup-blocked"
-            ? "Popup Google diblokir browser. Izinkan popup atau lanjutkan tanpa popup."
-            : code === "auth/operation-not-allowed"
-              ? "Login Google belum diaktifkan pada Firebase Authentication."
-              : code === "auth/unauthorized-domain"
-                ? "Domain aplikasi belum diizinkan pada pengaturan Firebase Authentication."
-                : cause instanceof Error
-                  ? cause.message
-                  : "Login dengan Google gagal. Periksa koneksi dan coba kembali.",
-      );
-      setShowGoogleRedirect(code === "auth/popup-closed-by-user" || code === "auth/popup-blocked");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function handleGoogleRedirect() {
-    setError("");
-    setShowGoogleRedirect(false);
-    setPending(true);
     try {
       await setPersistence(firebaseAuth, browserSessionPersistence);
       await signInWithRedirect(firebaseAuth, new GoogleAuthProvider());
     } catch (cause) {
-      const code = typeof cause === "object" && cause !== null && "code" in cause
-        ? String(cause.code)
-        : "";
-      setError(
-        code === "auth/operation-not-allowed"
-          ? "Login Google belum diaktifkan pada Firebase Authentication."
-          : code === "auth/unauthorized-domain"
-            ? "Domain aplikasi belum diizinkan pada pengaturan Firebase Authentication."
-            : cause instanceof Error
-              ? cause.message
-              : "Login dengan Google gagal. Periksa koneksi dan coba kembali.",
-      );
+      setError(getGoogleLoginError(cause));
       setPending(false);
     }
   }
@@ -234,16 +186,6 @@ export function LoginForm() {
         </p>
         {notice && <p role="status" className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</p>}
         {error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
-        {showGoogleRedirect && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={handleGoogleRedirect}
-            className="mt-3 w-full rounded-xl bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
-          >
-            Coba masuk Google tanpa popup
-          </button>
-        )}
         <button
           type="button"
           disabled={pending}
@@ -256,7 +198,7 @@ export function LoginForm() {
             <path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.55 2.56 10.78l7.97-6.19Z" />
             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.87l-7.65-5.93c-2.13 1.43-4.86 2.28-8.25 2.28-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z" />
           </svg>
-          {pending ? "Menghubungkan ke Google..." : "Masuk dengan Google"}
+          {pending ? "Membuka Google..." : "Masuk dengan Google"}
         </button>
         <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
           <span className="h-px flex-1 bg-slate-200" />
