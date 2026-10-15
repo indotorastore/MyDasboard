@@ -77,7 +77,14 @@ export async function POST(request: Request) {
         role,
         email: user.email ?? null,
         displayName: user.displayName ?? null,
-        ...(existingProfile.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+        ...(existingProfile.exists ? {} : {
+          createdAt: FieldValue.serverTimestamp(),
+          tradingAccess: {
+            status: role === "admin" ? "active" : "pending",
+            expiresAt: null,
+            activatedAt: null,
+          },
+        }),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
     });

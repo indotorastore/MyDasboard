@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getUserSession } from "@/lib/auth/session";
+import { getUserSession, hasTradingAccess } from "@/lib/auth/session";
+import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
 
 const intervals = new Set(["15min", "1h", "4h", "1day"]);
 const intervalMilliseconds: Record<string, number> = {
@@ -24,8 +25,17 @@ type ProviderResponse = {
 };
 
 export async function GET(request: Request) {
-  if (!await getUserSession()) {
+  const session = await getUserSession();
+  if (!session) {
     return NextResponse.json({ error: "Silakan masuk untuk mengakses data ini." }, { status: 401 });
+  }
+  if (!hasTradingAccess(session)) {
+    return NextResponse.json(
+      { error: session.tradingAccess.status === "expired"
+        ? "Masa akses Trading telah berakhir. Hubungi administrator untuk mengaktifkannya kembali."
+        : "Akses Trading Anda masih menunggu persetujuan administrator." },
+      { status: 403 },
+    );
   }
 
   const { searchParams } = new URL(request.url);
@@ -40,10 +50,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Timeframe tidak didukung." }, { status: 400 });
   }
 
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  const profile = await getFirebaseAdminFirestore().collection("users").doc(session.uid).get();
+  const integrations = profile.data()?.integrations;
+  const userApiKey = typeof integrations?.twelveDataApiKey === "string"
+    ? integrations.twelveDataApiKey.trim()
+    : "";
+  const apiKey = userApiKey;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Data Forex belum dikonfigurasi. Tambahkan TWELVE_DATA_API_KEY di environment server." },
+      { error: "Data Forex belum dikonfigurasi. Minta administrator menambahkan API key Twelve Data untuk akun ini." },
       { status: 503 },
     );
   }

@@ -5,6 +5,7 @@ import { getUserSession } from "@/lib/auth/session";
 import { AdminDashboard, type AdminUser } from "@/components/admin/admin-dashboard";
 import { Timestamp } from "firebase-admin/firestore";
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
+import { resolveTradingAccessStatus } from "@/lib/auth/session";
 
 export const instant = false;
 
@@ -28,13 +29,20 @@ async function AuthenticatedWorkspace() {
     ]);
     const users: AdminUser[] = userSnapshot.docs.map((document) => {
       const data = document.data();
+      const access = data.tradingAccess;
+      const expiration = access?.expiresAt instanceof Timestamp ? access.expiresAt.toDate() : null;
+      const storedStatus = access?.status;
+      const role = data.role === "admin" ? "admin" : "user";
+      const tradingStatus = resolveTradingAccessStatus(role, storedStatus, expiration);
       return {
         uid: document.id,
         email: typeof data.email === "string" ? data.email : "",
         displayName: typeof data.displayName === "string" ? data.displayName : "",
         username: typeof data.username === "string" ? data.username : "",
-        role: data.role === "admin" ? "admin" : "user",
+        role,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : null,
+        tradingStatus,
+        tradingExpiresAt: expiration?.toISOString() ?? null,
       };
     });
 

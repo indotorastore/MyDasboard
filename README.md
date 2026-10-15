@@ -32,7 +32,7 @@ Salin `.env.example` menjadi `.env.local`, lalu isi variabel yang diperlukan unt
 cp .env.example .env.local
 ```
 
-Menu Trading menyediakan analisa aturan EMA 20/50 dan RSI 14, serta prediksi statistik analog historis untuk pair Forex, watchlist yang dapat diubah, timeframe candle, dan estimasi risiko. Prediksi membandingkan kondisi tren/RSI/momentum sekarang dengan hingga 30 kondisi historis terdekat dan merangkum arah pergerakan setelah 1, 3, atau 6 candle. API meminta hingga 500 candle dari Twelve Data; isi `TWELVE_DATA_API_KEY` untuk mengaktifkannya. Jangan gunakan prefix `NEXT_PUBLIC_` untuk API key. Tanpa key atau saat penyedia data tidak tersedia, halaman menampilkan status error dan tidak menggunakan angka simulasi sebagai sinyal.
+Menu Trading menyediakan analisa aturan EMA 20/50 dan RSI 14, serta prediksi statistik analog historis untuk pair Forex, watchlist yang dapat diubah, timeframe candle, dan estimasi risiko. Prediksi membandingkan kondisi tren/RSI/momentum sekarang dengan hingga 30 kondisi historis terdekat dan merangkum arah pergerakan setelah 1, 3, atau 6 candle. Pengguna baru berstatus Pending dan menu Trading terkunci sampai admin menyimpan API key Twelve Data khusus akun serta memilih Trial 14 hari atau Aktif 1 tahun. Kedua status kedaluwarsa otomatis; admin dapat menangguhkan akses kapan saja. Key disimpan di Firestore melalui server Admin SDK dan tidak dikirim kembali ke browser. Akun lama tanpa status akses juga perlu disetujui admin.
 
 Persentase arah adalah frekuensi berbobot dari sampel analog, bukan probabilitas terkalibrasi atau jaminan prediksi. Hasil tidak ditampilkan bila kurang dari 15 sampel tersedia. Metode ini belum merupakan machine-learning model dan belum divalidasi dengan backtest terpisah.
 

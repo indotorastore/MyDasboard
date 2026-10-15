@@ -578,8 +578,8 @@ export function ForexDashboard() {
             <section role="alert" className="mb-4 rounded-[20px] border border-rose-200 bg-rose-50 p-5">
               <h2 className="text-[13px] font-bold text-rose-800">Analisa belum tersedia</h2>
               <p className="mt-1 text-[11px] leading-relaxed text-rose-700">{error}</p>
-              {error.includes("TWELVE_DATA_API_KEY") && (
-                <p className="mt-2 text-[10px] text-rose-700">Simpan key Twelve Data sebagai environment variable server, lalu mulai ulang aplikasi.</p>
+              {error.includes("Data Forex belum dikonfigurasi") && (
+                <p className="mt-2 text-[10px] text-rose-700">Minta administrator menambahkan API key Twelve Data untuk akun Anda.</p>
               )}
               <button onClick={() => setRefreshCount((count) => count + 1)} className="mt-3 rounded-lg bg-rose-700 px-3 py-2 text-[10px] font-semibold text-white">
                 Coba lagi

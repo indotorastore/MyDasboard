@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUserSession } from "@/lib/auth/session";
+import { getUserSession, hasTradingAccess } from "@/lib/auth/session";
 
 export const maxDuration = 30;
 
@@ -43,8 +43,17 @@ function getProviderError(payload: unknown): string | undefined {
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
 
 export async function POST(request: Request) {
-  if (!await getUserSession()) {
+  const session = await getUserSession();
+  if (!session) {
     return NextResponse.json({ error: "Silakan masuk untuk mengakses analisa ini." }, { status: 401 });
+  }
+  if (!hasTradingAccess(session)) {
+    return NextResponse.json(
+      { error: session.tradingAccess.status === "expired"
+        ? "Masa akses Trading telah berakhir. Hubungi administrator untuk mengaktifkannya kembali."
+        : "Akses Trading Anda masih menunggu persetujuan administrator." },
+      { status: 403 },
+    );
   }
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();

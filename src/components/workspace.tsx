@@ -70,7 +70,16 @@ const shortcuts: {
 export function Workspace({
   user,
 }: {
-  user: { email: string | null; displayName: string | null; username: string; role: "admin" | "user" };
+  user: {
+    email: string | null;
+    displayName: string | null;
+    username: string;
+    role: "admin" | "user";
+    tradingAccess: {
+      status: "pending" | "trial" | "active" | "expired";
+      expiresAt: string | null;
+    };
+  };
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [query, setQuery] = useState("");
@@ -80,6 +89,9 @@ export function Workspace({
   const displayName = user.displayName?.trim() || user.username;
   const firstName = displayName.split(/\s+/)[0];
   const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
+  const canTrade = user.role === "admin"
+    || user.tradingAccess.status === "trial"
+    || user.tradingAccess.status === "active";
 
   const completedTasks = tasks.filter((task) => task.done).length;
   const filteredTasks = useMemo(
@@ -249,7 +261,28 @@ export function Workspace({
         </header>
 
         <main className="mx-auto max-w-[1180px] px-5 pb-28 pt-7 sm:px-8 sm:pt-9 lg:px-10 lg:pb-12 lg:pt-10">
-          {activeNav === "Trading" ? <ForexDashboard /> : activeNav === "Pengaturan" ? (
+          {activeNav === "Trading" ? canTrade ? <ForexDashboard /> : (
+            <section className="mx-auto max-w-2xl rounded-[22px] border border-amber-200 bg-white p-6 shadow-sm sm:p-8">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700">Akses Trading</p>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                {user.tradingAccess.status === "expired" ? "Masa akses telah berakhir" : "Menunggu persetujuan admin"}
+              </h1>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                {user.tradingAccess.status === "expired"
+                  ? "Minta admin mengaktifkan kembali akses Trading Anda."
+                  : "Akun Anda sudah terdaftar. Menu Trading akan terbuka setelah admin menyetujui akses dan mengatur API Twelve Data."}
+              </p>
+              {user.tradingAccess.expiresAt && (
+                <p className="mt-4 text-xs font-medium text-slate-500">
+                  Akses berakhir: {new Intl.DateTimeFormat("id-ID", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    timeZone: "Asia/Jakarta",
+                  }).format(new Date(user.tradingAccess.expiresAt))}
+                </p>
+              )}
+            </section>
+          ) : activeNav === "Pengaturan" ? (
             <AccountSettings email={user.email ?? ""} displayName={displayName} username={user.username} role={user.role} />
           ) : (
             <>
