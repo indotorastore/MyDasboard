@@ -20,7 +20,7 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 ## Progressive Web App
 
-Ruangku dapat dipasang dari menu instalasi browser yang mendukung web app. Di iPhone/iPad, buka dengan Safari dan pilih **Bagikan → Tambah ke Layar Utama**. Service worker menyimpan aset Next.js dan halaman beranda yang pernah dibuka agar dapat dimuat kembali saat offline; data Forex/API tidak disimpan dan memerlukan koneksi internet.
+Ruangku dapat dipasang dari menu instalasi browser yang mendukung web app. Di iPhone/iPad, buka dengan Safari dan pilih **Bagikan → Tambah ke Layar Utama**. Saat offline, service worker menampilkan halaman offline sederhana dan memakai cache aset aplikasi jika diperlukan; halaman akun dan data Forex/API memerlukan koneksi internet. Service worker memeriksa versi terbaru aset dari server sebelum menggunakan cache agar tidak memakai bundle lama setelah pembaruan aplikasi.
 
 Logo aplikasi dan ikon browser/PWA menggunakan PNG `public/ruangku-logo.png`, dengan ukuran ikon instalasi yang dibuat dari file tersebut.
 

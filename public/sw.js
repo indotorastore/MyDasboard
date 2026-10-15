@@ -1,40 +1,15 @@
-const CACHE_NAME = "ruangku-shell-v1";
-const SHELL_URL = new URL("/", self.location.origin).href;
+const CACHE_NAME = "ruangku-shell-v3";
+const OFFLINE_URL = new URL("/offline.html", self.location.origin).href;
 
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
-    await self.skipWaiting();
     try {
-      const response = await fetch(SHELL_URL, { credentials: "omit" });
-      const cacheControl = response.headers.get("cache-control") ?? "";
-      if (
-        response.ok &&
-        response.headers.get("content-type")?.includes("text/html") &&
-        !/\b(private|no-store)\b/i.test(cacheControl)
-      ) {
-        const cache = await caches.open(CACHE_NAME);
-        const html = await response.clone().text();
-        await cache.put(SHELL_URL, response);
-        const assetUrls = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
-          .map((match) => new URL(match[1], self.location.origin))
-          .filter((assetUrl) =>
-            assetUrl.origin === self.location.origin &&
-            (assetUrl.pathname.startsWith("/_next/static/") ||
-              /\.(?:css|js|woff2?|ttf|png|svg|ico|webp)$/i.test(assetUrl.pathname)),
-          )
-          .map((assetUrl) => assetUrl.href);
-        await Promise.all(assetUrls.map(async (assetUrl) => {
-          try {
-            const assetResponse = await fetch(assetUrl, { credentials: "omit" });
-            if (assetResponse.ok) await cache.put(assetUrl, assetResponse);
-          } catch (error) {
-            console.warn("Gagal menyimpan aset PWA untuk penggunaan offline:", error);
-          }
-        }));
-      }
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll([OFFLINE_URL, new URL("/ruangku-logo.png", self.location.origin).href]);
     } catch (error) {
-      console.warn("Gagal menyimpan halaman Ruangku untuk penggunaan offline:", error);
+      console.error("Gagal menyimpan halaman offline Ruangku:", error);
     }
+    await self.skipWaiting();
   })());
 });
 
@@ -67,26 +42,11 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith((async () => {
       try {
-        const response = await fetch(request);
-        const cacheControl = response.headers.get("cache-control") ?? "";
-        if (
-          url.pathname === "/" &&
-          !url.search &&
-          !request.headers.has("cookie") &&
-          response.ok &&
-          response.headers.get("content-type")?.includes("text/html") &&
-          !/\b(private|no-store)\b/i.test(cacheControl)
-        ) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(SHELL_URL, response.clone());
-        }
-        return response;
-      } catch (error) {
-        if (url.pathname === "/" && !url.search) {
-          const cachedShell = await caches.match(SHELL_URL);
-          if (cachedShell) return cachedShell;
-        }
-        throw error;
+        return await fetch(request);
+      } catch {
+        const offlinePage = await caches.match(OFFLINE_URL);
+        if (offlinePage) return offlinePage;
+        return Response.error();
       }
     })());
     return;
@@ -98,12 +58,15 @@ self.addEventListener("fetch", (event) => {
   ) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cachedResponse = await cache.match(request);
-      if (cachedResponse) return cachedResponse;
-
-      const response = await fetch(request);
-      if (response.ok) await cache.put(request, response.clone());
-      return response;
+      try {
+        const response = await fetch(request);
+        if (response.ok) await cache.put(request, response.clone());
+        return response;
+      } catch (error) {
+        const cachedResponse = await cache.match(request);
+        if (cachedResponse) return cachedResponse;
+        throw error;
+      }
     })());
   }
 });
