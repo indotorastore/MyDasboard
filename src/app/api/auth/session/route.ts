@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getFirebaseAdminAuth, getFirebaseAdminFirestore } from "@/lib/firebase/admin";
@@ -30,25 +31,31 @@ export async function POST(request: Request) {
     const user = await auth.getUser(decoded.uid);
     const role = decoded.admin === true ? "admin" : "user";
     const submittedUsername = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
-    const username = role === "admin"
+    const emailPrefix = user.email?.split("@")[0]?.toLowerCase()
+      .replace(/[^a-z0-9._-]/g, "-")
+      .replace(/^[._-]+|[._-]+$/g, "")
+      .slice(0, 15);
+    const uidSuffix = createHash("sha256").update(user.uid).digest("hex").slice(0, 8);
+    const fallbackUsername = role === "admin"
       ? (typeof decoded.username === "string" ? decoded.username : "admin")
-      : submittedUsername || user.email?.split("@")[0]?.toLowerCase() || `user-${user.uid.slice(0, 8)}`;
-
-    if (!/^[a-z0-9._-]{3,24}$/.test(username)) {
-      return NextResponse.json(
-        { error: "Username harus 3–24 karakter dan hanya boleh berisi huruf kecil, angka, titik, garis bawah, atau tanda hubung." },
-        { status: 400 },
-      );
-    }
+      : `${emailPrefix || "user"}-${uidSuffix}`;
 
     const db = getFirebaseAdminFirestore();
     const profileRef = db.collection("users").doc(user.uid);
-    const usernameRef = db.collection("usernames").doc(username);
     await db.runTransaction(async (transaction) => {
-      const [usernameSnapshot, profileMatches, existingProfile] = await Promise.all([
+      const existingProfile = await transaction.get(profileRef);
+      const existingUsername = existingProfile.data()?.username;
+      const username = role === "admin"
+        ? fallbackUsername
+        : submittedUsername || (typeof existingUsername === "string" ? existingUsername : fallbackUsername);
+      if (!/^[a-z0-9._-]{3,24}$/.test(username)) {
+        throw new Error("INVALID_USERNAME");
+      }
+
+      const usernameRef = db.collection("usernames").doc(username);
+      const [usernameSnapshot, profileMatches] = await Promise.all([
         transaction.get(usernameRef),
         transaction.get(db.collection("users").where("username", "==", username).limit(1)),
-        transaction.get(profileRef),
       ]);
       if (usernameSnapshot.exists && usernameSnapshot.get("uid") !== user.uid) {
         throw new Error("USERNAME_TAKEN");
@@ -56,7 +63,7 @@ export async function POST(request: Request) {
       if (profileMatches.docs.some((profile) => profile.id !== user.uid)) {
         throw new Error("USERNAME_TAKEN");
       }
-      const currentUsername = existingProfile.data()?.username;
+      const currentUsername = existingUsername;
       if (typeof currentUsername === "string" && currentUsername !== username) {
         const oldUsernameRef = db.collection("usernames").doc(currentUsername);
         const oldUsername = await transaction.get(oldUsernameRef);
@@ -90,6 +97,12 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "USERNAME_TAKEN") {
       return NextResponse.json({ error: "Username sudah digunakan. Pilih username lain." }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "INVALID_USERNAME") {
+      return NextResponse.json(
+        { error: "Username harus 3–24 karakter dan hanya boleh berisi huruf kecil, angka, titik, garis bawah, atau tanda hubung." },
+        { status: 400 },
+      );
     }
     if (
       typeof error === "object" &&

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,7 +39,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <PwaInstallPrompt />
       </body>
     </html>
   );
