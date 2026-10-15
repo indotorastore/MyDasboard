@@ -17,6 +17,8 @@ import {
 } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase/client";
 
+const GOOGLE_REDIRECT_PENDING_KEY = "ruangku-google-login-pending";
+
 function getGoogleLoginError(cause: unknown) {
   const code = typeof cause === "object" && cause !== null && "code" in cause
     ? String(cause.code)
@@ -33,6 +35,14 @@ function getGoogleLoginError(cause: unknown) {
   return cause instanceof Error ? cause.message : "Login dengan Google gagal. Silakan coba kembali.";
 }
 
+function clearPendingGoogleRedirect() {
+  try {
+    window.sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
+  } catch (error) {
+    console.error("Status login Google tidak dapat dibersihkan:", error);
+  }
+}
+
 export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -46,13 +56,30 @@ export function LoginForm() {
   useEffect(() => {
     void getRedirectResult(firebaseAuth)
       .then(async (credential) => {
-        if (!credential || redirectResultHandled.current) return;
+        let redirectWasPending: boolean;
+        try {
+          redirectWasPending = window.sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) === "true";
+        } catch (cause) {
+          setError(getGoogleLoginError(cause));
+          return;
+        }
+        if ((!credential && !redirectWasPending) || redirectResultHandled.current) return;
         redirectResultHandled.current = true;
         setPending(true);
 
-        let signedIn = true;
+        let signedIn = false;
         try {
-          const idToken = await credential.user.getIdToken(true);
+          let authUser = credential?.user ?? null;
+          if (!authUser) {
+            await firebaseAuth.authStateReady();
+            authUser = firebaseAuth.currentUser;
+          }
+          if (!authUser) {
+            throw new Error("Google tidak mengembalikan sesi login. Periksa pengaturan domain OAuth lalu coba kembali.");
+          }
+          signedIn = true;
+          clearPendingGoogleRedirect();
+          const idToken = await authUser.getIdToken(true);
           const response = await fetch("/api/auth/session", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -76,10 +103,12 @@ export function LoginForm() {
           }
           setError(getGoogleLoginError(cause));
         } finally {
+          clearPendingGoogleRedirect();
           setPending(false);
         }
       })
       .catch((cause: unknown) => {
+        clearPendingGoogleRedirect();
         setError(getGoogleLoginError(cause));
         setPending(false);
       });
@@ -91,9 +120,11 @@ export function LoginForm() {
     setPending(true);
 
     try {
+      window.sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, "true");
       await setPersistence(firebaseAuth, browserSessionPersistence);
       await signInWithRedirect(firebaseAuth, new GoogleAuthProvider());
     } catch (cause) {
+      clearPendingGoogleRedirect();
       setError(getGoogleLoginError(cause));
       setPending(false);
     }
