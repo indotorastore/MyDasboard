@@ -4,6 +4,14 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  async rewrites() {
+    return [
+      {
+        source: "/__/auth/:path*",
+        destination: "https://c14-fitebase.firebaseapp.com/__/auth/:path*",
+      },
+    ];
+  },
   async headers() {
     return [
       {
