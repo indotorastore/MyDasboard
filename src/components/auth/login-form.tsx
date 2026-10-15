@@ -3,14 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   GoogleAuthProvider,
+  browserSessionPersistence,
+  getRedirectResult,
   inMemoryPersistence,
   sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase/client";
@@ -23,6 +26,49 @@ export function LoginForm() {
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [resetPending, setResetPending] = useState(false);
+  const [showGoogleRedirect, setShowGoogleRedirect] = useState(false);
+  const redirectResultHandled = useRef(false);
+
+  useEffect(() => {
+    void getRedirectResult(firebaseAuth)
+      .then(async (credential) => {
+        if (!credential || redirectResultHandled.current) return;
+        redirectResultHandled.current = true;
+        setPending(true);
+
+        let signedIn = true;
+        try {
+          const idToken = await credential.user.getIdToken(true);
+          const response = await fetch("/api/auth/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken }),
+          });
+          if (!response.ok) {
+            const body = await response.json().catch(() => ({})) as { error?: string };
+            throw new Error(body.error ?? "Akun ini belum diizinkan masuk ke Ruangku.");
+          }
+          await signOut(firebaseAuth);
+          signedIn = false;
+          router.replace("/");
+          router.refresh();
+        } catch (cause) {
+          if (signedIn && firebaseAuth.currentUser) {
+            try {
+              await signOut(firebaseAuth);
+            } catch (signOutError) {
+              console.error("Gagal membersihkan sesi Firebase client setelah login Google gagal:", signOutError);
+            }
+          }
+          setError(cause instanceof Error ? cause.message : "Login dengan Google gagal. Coba kembali.");
+        } finally {
+          setPending(false);
+        }
+      })
+      .catch((cause: unknown) => {
+        setError(cause instanceof Error ? cause.message : "Hasil login Google tidak dapat diverifikasi.");
+      });
+  }, [router]);
 
   async function handleGoogleLogin() {
     setError("");
@@ -60,9 +106,9 @@ export function LoginForm() {
         : "";
       setError(
         code === "auth/popup-closed-by-user"
-          ? "Proses masuk Google dibatalkan."
+            ? "Jendela Google tertutup sebelum proses masuk selesai."
           : code === "auth/popup-blocked"
-            ? "Popup Google diblokir browser. Izinkan popup lalu coba kembali."
+            ? "Popup Google diblokir browser. Izinkan popup atau lanjutkan tanpa popup."
             : code === "auth/operation-not-allowed"
               ? "Login Google belum diaktifkan pada Firebase Authentication."
               : code === "auth/unauthorized-domain"
@@ -71,7 +117,32 @@ export function LoginForm() {
                   ? cause.message
                   : "Login dengan Google gagal. Periksa koneksi dan coba kembali.",
       );
+      setShowGoogleRedirect(code === "auth/popup-closed-by-user" || code === "auth/popup-blocked");
     } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleGoogleRedirect() {
+    setError("");
+    setShowGoogleRedirect(false);
+    setPending(true);
+    try {
+      await setPersistence(firebaseAuth, browserSessionPersistence);
+      await signInWithRedirect(firebaseAuth, new GoogleAuthProvider());
+    } catch (cause) {
+      const code = typeof cause === "object" && cause !== null && "code" in cause
+        ? String(cause.code)
+        : "";
+      setError(
+        code === "auth/operation-not-allowed"
+          ? "Login Google belum diaktifkan pada Firebase Authentication."
+          : code === "auth/unauthorized-domain"
+            ? "Domain aplikasi belum diizinkan pada pengaturan Firebase Authentication."
+            : cause instanceof Error
+              ? cause.message
+              : "Login dengan Google gagal. Periksa koneksi dan coba kembali.",
+      );
       setPending(false);
     }
   }
@@ -163,6 +234,16 @@ export function LoginForm() {
         </p>
         {notice && <p role="status" className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</p>}
         {error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
+        {showGoogleRedirect && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={handleGoogleRedirect}
+            className="mt-3 w-full rounded-xl bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
+          >
+            Coba masuk Google tanpa popup
+          </button>
+        )}
         <button
           type="button"
           disabled={pending}
