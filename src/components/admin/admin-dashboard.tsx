@@ -121,7 +121,13 @@ export function AdminDashboard({
     setApiKeyNotice("");
     setApiKeySaving(true);
     try {
-      const accessStatus = new FormData(event.currentTarget).get("accessStatus");
+      const submitter = (event.nativeEvent as SubmitEvent).submitter;
+      const accessStatus = submitter instanceof HTMLButtonElement && submitter.name === "accessStatus"
+        ? submitter.value
+        : "";
+      if (!accessStatus) {
+        throw new Error("Pilih status Pending, Trial, atau Aktif.");
+      }
       const response = await fetch(`/api/admin/users/${encodeURIComponent(selectedApiUser.uid)}/twelve-data-key`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
